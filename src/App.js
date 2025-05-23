@@ -22,13 +22,15 @@ function arrayBufferToBase64(buffer) {
 }
 
 // Converte uma string PEM (apenas a parte Base64 da chave pública) para ArrayBuffer
+// Usado para importar a chave pública RSA
 function pemToArrayBuffer(pem) {
+  // Remove o cabeçalho, rodapé e quebras de linha do formato PEM
   const b64Lines = pem.replace('-----BEGIN PUBLIC KEY-----', '')
                       .replace('-----END PUBLIC KEY-----', '')
-                      .replace(/\r/g, '')
-                      .replace(/\n/g, '');
+                      .replace(/\r/g, '') // Remove \r (carriage return)
+                      .replace(/\n/g, ''); // Remove \n (newline)
   try {
-    const binary_string = window.atob(b64Lines);
+    const binary_string = window.atob(b64Lines); // Decodifica Base64 para string binária
     const len = binary_string.length;
     const bytes = new Uint8Array(len);
     for (let i = 0; i < len; i++) {
@@ -42,34 +44,37 @@ function pemToArrayBuffer(pem) {
   }
 }
 
+
+// Importa a chave pública RSA (formato PEM SPKI)
 async function importRsaPublicKey(pemPublicKey) {
   try {
     const publicKeyBuffer = pemToArrayBuffer(pemPublicKey);
     return await window.crypto.subtle.importKey(
-      "spki",
+      "spki", // SubjectPublicKeyInfo format (usado por chaves PEM públicas)
       publicKeyBuffer,
       {
         name: "RSA-OAEP",
-        hash: "SHA-256",
+        hash: "SHA-256", // Deve corresponder ao usado no backend para descriptografia (oaepHash)
       },
-      true,
-      ["encrypt"]
+      true, // whether the key is extractable (não estritamente necessário para apenas criptografar)
+      ["encrypt"] // key usages: apenas para criptografar a chave de sessão AES
     );
   } catch (error) {
     console.error("Erro ao importar a chave pública RSA:", error);
-    throw error;
+    throw error; // Re-lança o erro para ser tratado pelo chamador
   }
 }
 
+// Gera uma chave de sessão AES-GCM
 async function generateAesSessionKey() {
   try {
     return await window.crypto.subtle.generateKey(
       {
         name: "AES-GCM",
-        length: 256,
+        length: 256, // Comprimento da chave em bits (AES-256)
       },
-      true,
-      ["encrypt", "decrypt"]
+      true, // whether the key is extractable (necessário para exportá-la para criptografia RSA)
+      ["encrypt", "decrypt"] // key usages (encrypt para os dados, decrypt não usado aqui mas é comum)
     );
   } catch (error) {
     console.error("Erro ao gerar a chave de sessão AES:", error);
@@ -77,14 +82,16 @@ async function generateAesSessionKey() {
   }
 }
 
-async function encryptWithRsaPublicKey(rsaPublicKeyObject, dataBuffer) {
+// Criptografa dados com RSA-OAEP (usado para a chave de sessão AES)
+async function encryptWithRsaPublicKey(rsaPublicKeyObject, dataBuffer) { // dataBuffer é a chave AES exportada como ArrayBuffer
   try {
     return await window.crypto.subtle.encrypt(
       {
         name: "RSA-OAEP",
+        // Nenhum IV é usado aqui para RSA-OAEP na Web Crypto API
       },
-      rsaPublicKeyObject,
-      dataBuffer
+      rsaPublicKeyObject, // O objeto CryptoKey importado
+      dataBuffer // A chave AES como ArrayBuffer
     );
   } catch (error) {
     console.error("Erro ao criptografar com RSA-OAEP:", error);
@@ -92,20 +99,22 @@ async function encryptWithRsaPublicKey(rsaPublicKeyObject, dataBuffer) {
   }
 }
 
+// Criptografa dados com AES-GCM (usado para os dados do formulário)
 async function encryptWithAesSessionKey(aesKeyObject, dataString) {
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const encodedData = new TextEncoder().encode(dataString);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12)); // IV de 12 bytes é recomendado para AES-GCM
+  const encodedData = new TextEncoder().encode(dataString); // Converte a string de dados para ArrayBuffer
   try {
     const ciphertext = await window.crypto.subtle.encrypt(
       {
         name: "AES-GCM",
-        iv: iv,
+        iv: iv, // O vetor de inicialização
       },
-      aesKeyObject,
-      encodedData
+      aesKeyObject, // O objeto CryptoKey AES
+      encodedData // Os dados do formulário como ArrayBuffer
     );
+    // Retorna o ciphertext (que já inclui a auth tag no AES-GCM da Web Crypto) e o iv
     return {
-      ciphertext: arrayBufferToBase64(ciphertext),
+      ciphertext: arrayBufferToBase64(ciphertext), // Ciphertext + AuthTag
       iv: arrayBufferToBase64(iv),
     };
   } catch (error) {
@@ -116,6 +125,7 @@ async function encryptWithAesSessionKey(aesKeyObject, dataString) {
 
 // --- Fim das Funções de Criptografia ---
 
+
 const ValeLogo = () => <div className="text-2xl font-bold" style={{ color: VALE_GREEN }}>VALE</div>;
 const Header = () => (
   <header className="w-full p-4 flex items-center justify-between" style={{ backgroundColor: VALE_GREEN, color: VALE_HEADER_TEXT }}>
@@ -123,8 +133,7 @@ const Header = () => (
   </header>
 );
 
-// --- Funções de Validação ---
-const validateCPF = (cpf) => {  
+const validateCPF = (cpf) => { 
   if (!cpf) return "CPF é obrigatório.";
   const cpfClean = cpf.replace(/[^\d]/g, "");
   if (cpfClean.length !== 11) return "CPF deve ter 11 dígitos.";
@@ -174,13 +183,13 @@ const InitialScreen = ({ onNavigate }) => {
       <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 w-full max-w-3xl rounded-md shadow-md">
         <p className="font-bold text-sm sm:text-base">PREENCHA SEUS DADOS CORRETAMENTE, PARA QUE NÃO HAJA DIVERGÊNCIAS NO CERTIFICADO!!</p>
         <p className="mt-2 text-xs sm:text-sm">OBS.: O e-mail deverá ser exclusivo e único do usuário, não sendo possível mais de um usuário utilizar o mesmo e-mail. Para usuários que possuem e-mail CO Vale, não cadastrar o CO e sim um e-mail pessoal ou e-mail da empresa de origem. Para usuários estrangeiros utilizar o número do passaporte no campo de CPF.</p>
-        <p className="mt-2 text-xs sm:text-sm">Em caso de dúvidas, enviar um email para hse.suppliers@vale.com.</p>
+        <p className="mt-2 text-xs sm:text-sm">Em caso de dúvidas, enviar um email para ssma.fornecedores@vale.com</p>
       </div>
       <hr className="w-full max-w-3xl my-4 border-gray-400"/>
       <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 w-full max-w-3xl rounded-md shadow-md">
         <p className="font-bold text-sm sm:text-base">FILL IN YOUR DATA CORRECTLY, SO THAT THERE ARE NO DIVERGENCES IN THE CERTIFICATE!</p>
         <p className="mt-2 text-xs sm:text-sm">NOTE: The email address must be exclusive and unique to the user. It is not possible for more than one user to use the same email address. For users with a CO email address, do not register the CO email Vale. Register a personal email address or the company of origin's email address. For foreign users , use the passport number in the CPF field.</p>
-        <p className="mt-2 text-xs sm:text-sm">If you have any questions, please email hse.suppliers@vale.com</p>
+        <p className="mt-2 text-xs sm:text-sm">If you have any questions, please email ssma.fornecedores@vale.com</p>
       </div>
       <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-8 my-6">
         <label className="flex items-center space-x-2 p-3 rounded-md hover:bg-gray-300 cursor-pointer transition-colors">
@@ -216,10 +225,6 @@ const InputField = ({ label, id, type = "text", value, onChange, error, disabled
 
 // Componente de Formulário Genérico para evitar repetição
 const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
-  // ***** ALTERAÇÃO 1: Definir a URL base da API *****
-  // Se estiver usando Vite, seria process.env.VITE_API_BASE_URL
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL; 
-
   const initialFormData = isBrazilForm ? {
     cpf: '', email: '', nome: '', sobrenome: '', numeroContrato: '',
     pais: 'BRAZIL', data: getFormattedDate(),
@@ -231,25 +236,18 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [serverRsaPublicKeyObject, setServerRsaPublicKeyObject] = useState(null);
+  const [serverRsaPublicKeyObject, setServerRsaPublicKeyObject] = useState(null); // Objeto CryptoKey da chave pública RSA
   const [publicKeyError, setPublicKeyError] = useState('');
 
+  // Busca a chave pública RSA do servidor ao montar o componente
   useEffect(() => {
     const fetchPublicKey = async () => {
-      setPublicKeyError('');
-      // ***** ALTERAÇÃO 2: Verificar se API_BASE_URL está definida *****
-      if (!API_BASE_URL) {
-        console.error("ERRO: A URL base da API não está definida. Verifique suas variáveis de ambiente (ex: REACT_APP_API_BASE_URL).");
-        setPublicKeyError("Erro de configuração: URL da API não encontrada. Verifique o console.");
-        return;
-      }
+      setPublicKeyError(''); // Limpa erro anterior
       try {
-        // ***** ALTERAÇÃO 3: Usar API_BASE_URL na chamada fetch *****
-        const response = await fetch(`${API_BASE_URL}/public-key`);
+        // ATENÇÃO: Atualize esta URL para a URL do seu backend em produção
+        const response = await fetch('https://backend-formvaleves-projects.vercel.app/api/public-key'); // URL do backend
         if (!response.ok) {
-          const errorBody = await response.text(); // Tenta ler o corpo do erro, se houver
-          console.error(`Falha ao buscar chave pública: ${response.status} ${response.statusText}`, errorBody);
-          throw new Error(`Falha ao buscar chave pública: ${response.status} ${response.statusText}. Detalhes: ${errorBody}`);
+          throw new Error(`Falha ao buscar chave pública: ${response.status} ${response.statusText}`);
         }
         const pemPublicKeyString = await response.text();
         if (!pemPublicKeyString.includes('-----BEGIN PUBLIC KEY-----')) {
@@ -261,12 +259,12 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
         console.log("Chave pública RSA importada com sucesso.");
       } catch (error) {
         console.error("Erro detalhado ao buscar ou importar chave pública RSA:", error);
-        setPublicKeyError(`Não foi possível carregar a chave de segurança do servidor. ${error.message}`);
+        setPublicKeyError("Não foi possível carregar a chave de segurança do servidor. Verifique a conexão e o console para detalhes.");
         setServerRsaPublicKeyObject(null);
       }
     };
     fetchPublicKey();
-  }, [API_BASE_URL]); // Adicionado API_BASE_URL como dependência
+  }, []); // Executa apenas uma vez ao montar
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -303,7 +301,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
   const isFormCompletelyValid = areDependentFieldsEnabled &&
     (isBrazilForm ? (formData.nome && formData.sobrenome && formData.numeroContrato)
                   : (formData.firstName && formData.lastName && formData.contractNumber)) &&
-    serverRsaPublicKeyObject;
+    serverRsaPublicKeyObject; // Garante que o objeto CryptoKey da chave pública foi carregado
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -313,24 +311,16 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
       return;
     }
     setIsSubmitting(true);
-    setPublicKeyError('');
-
-    // ***** ALTERAÇÃO 4: Verificar se API_BASE_URL está definida antes de submeter *****
-    if (!API_BASE_URL) {
-      alert("Erro de configuração: URL da API não encontrada. Não é possível enviar o formulário.");
-      setIsSubmitting(false);
-      return;
-    }
+    setPublicKeyError(''); // Limpa erro de chave pública se o submit iniciar
 
     let currentErrors = {};
-    // ... (sua lógica de validação de formulário continua aqui) ...
     if (isBrazilForm) {
       if (validateCPF(formData.cpf)) currentErrors.cpf = validateCPF(formData.cpf);
       if (validateEmail(formData.email)) currentErrors.email = validateEmail(formData.email);
       if (!formData.nome) currentErrors.nome = "Nome é obrigatório.";
       if (!formData.sobrenome) currentErrors.sobrenome = "Sobrenome é obrigatório.";
       if (!formData.numeroContrato) currentErrors.numeroContrato = "Número de Contrato é obrigatório.";
-    } else {  
+    } else { 
       if (validatePassport(formData.passportNumber)) currentErrors.passportNumber = validatePassport(formData.passportNumber);
       if (validateEmail(formData.emailAddress)) currentErrors.emailAddress = validateEmail(formData.emailAddress);
       if (!formData.firstName) currentErrors.firstName = "First Name is required.";
@@ -338,7 +328,6 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
       if (!formData.contractNumber) currentErrors.contractNumber = "Contract Number is required.";
     }
     setErrors(currentErrors);
-
 
     if (Object.keys(currentErrors).length === 0) {
       const dataToSubmitObject = { 
@@ -356,7 +345,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
         'Prior Years of Service (Years)': '', 'Prior Years of Service (Months)': '', 'Related Instructor ID': '',
         'Custom Column Name N1': 'Manager', 'Custom Column Value V1': 'GER GLOBAL SSMA FORNECEDORES - PATRICIA VELOSO DE ALMEIDA',
         'Custom Column Name N2': 'Centro de Custo', 'Custom Column Value V2': '1010132',
-        'Custom Column Name N3': '', 'Custom Column Value V3': isBrazilForm ? formData.numeroContrato : formData.contractNumber, // Corrigido aqui para usar o valor do campo correto
+        'Custom Column Name N3': '', 'Custom Column Value V3': isBrazilForm ? formData.numeroContrato : formData.contractNumber,
         'Custom Column Name N4': '', 'Custom Column Value V4': '', 'Custom Column Name N5': '', 'Custom Column Value V5': '',
         'Custom Column Name N6': '', 'Custom Column Value V6': '', 'Custom Column Name N7': '', 'Custom Column Value V7': '',
         'Custom Column Name N8': '', 'Custom Column Value V8': '', 'Custom Column Name N9': '', 'Custom Column Value V9': '',
@@ -370,17 +359,21 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
 
       try {
         console.log("Iniciando processo de criptografia e envio...");
+        // 1. Gerar chave de sessão AES
         const aesSessionKeyObject = await generateAesSessionKey(); 
         console.log("Chave de sessão AES gerada.");
         
+        // 2. Exportar chave AES para formato raw (ArrayBuffer) para ser criptografada com RSA
         const exportedAesKeyRawBuffer = await window.crypto.subtle.exportKey("raw", aesSessionKeyObject);
         console.log("Chave de sessão AES exportada para raw buffer.");
 
+        // 3. Criptografar a chave AES (raw ArrayBuffer) com a chave pública RSA do servidor
         console.log("Criptografando chave de sessão AES com RSA Public Key Object:", serverRsaPublicKeyObject);
         const encryptedSessionKeyBuffer = await encryptWithRsaPublicKey(serverRsaPublicKeyObject, exportedAesKeyRawBuffer);
         const encryptedSessionKeyBase64 = arrayBufferToBase64(encryptedSessionKeyBuffer);
         console.log("Chave de sessão AES criptografada com RSA:", encryptedSessionKeyBase64.substring(0,30) + "...");
 
+        // 4. Criptografar os dados do formulário com a chave de sessão AES original (CryptoKey)
         const { ciphertext: encryptedFormDataBase64, iv: ivBase64 } = await encryptWithAesSessionKey(aesSessionKeyObject, formDataString);
         console.log("Dados do formulário criptografados com AES:", encryptedFormDataBase64.substring(0,30) + "...");
         
@@ -390,22 +383,21 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
           encryptedData: encryptedFormDataBase64, 
         };
         
-        console.log("Payload final a ser enviado (primeiros 200 chars):", JSON.stringify(payload).substring(0, 200) + "...");
-        
-        // ***** ALTERAÇÃO 5: Usar API_BASE_URL na chamada fetch *****
-        const response = await fetch(`${API_BASE_URL}/submit-form`, {
+        console.log("Payload final a ser enviado:", JSON.stringify(payload, null, 2).substring(0, 200) + "...");
+        // ATENÇÃO: Atualize esta URL para a URL do seu backend em produção
+        const response = await fetch('https://backend-formvaleves-projects.vercel.app/api/submit-form', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
-        const result = await response.json(); // Sempre tente parsear, mesmo que seja erro, o backend pode enviar JSON
+        const result = await response.json();
 
         if (response.ok) {
           alert(`Sucesso (criptografia híbrida): ${result.message}`); 
           onNavigate('INITIAL'); 
         } else {
           console.error("Erro do backend:", result);
-          alert(`Erro ao enviar: ${result.message || `Ocorreu um problema no servidor (status ${response.status}).`}`);
+          alert(`Erro ao enviar: ${result.message || 'Ocorreu um problema no servidor.'}`);
         }
       } catch (error) {
         console.error("Erro na criptografia ou requisição fetch:", error);
@@ -422,7 +414,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
   const idFieldId = isBrazilForm ? "cpf" : "passportNumber";
   const idFieldValue = isBrazilForm ? formData.cpf : formData.passportNumber;
   const idFieldError = isBrazilForm ? errors.cpf : errors.passportNumber;
-  const idFieldPlaceholder = isBrazilForm ? "Apenas números" : "Your passport number"; // Ajustado placeholder CPF
+  const idFieldPlaceholder = isBrazilForm ? "___________" : "Your passport number";
   const emailFieldLabel = isBrazilForm ? "Email" : "Email Address";
   const emailFieldId = isBrazilForm ? "email" : "emailAddress";
   const emailFieldValue = isBrazilForm ? formData.email : formData.emailAddress;
@@ -466,8 +458,8 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
           <InputField label={contractFieldLabel} id={contractFieldId} value={contractFieldValue} onChange={handleChange} error={contractFieldError} disabled={!areDependentFieldsEnabled} placeholder={contractFieldPlaceholder}/>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <InputField label={isBrazilForm ? "País" : "Country"} id={countryFieldId} value={countryFieldValue} disabled={true} />
-            <div></div> <div></div>
+           <InputField label={isBrazilForm ? "País" : "Country"} id={countryFieldId} value={countryFieldValue} disabled={true} />
+           <div></div> <div></div>
         </div>
         <div className="flex flex-col sm:flex-row justify-between items-center mt-8">
           <button type="submit" disabled={!isFormCompletelyValid || isSubmitting || !!publicKeyError}
@@ -483,7 +475,6 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
   );
 };
 
-
 const BrazilForm = (props) => <BaseUserForm {...props} isBrazilForm={true} />;
 const InternationalForm = (props) => <BaseUserForm {...props} isBrazilForm={false} />;
 
@@ -497,14 +488,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    // ***** ALTERAÇÃO 6: Bloco do Tailwind CDN removido/comentado *****
-    /* if (!document.querySelector('script[src="https://cdn.tailwindcss.com"]')) {
+    if (!document.querySelector('script[src="https://cdn.tailwindcss.com"]')) {
         const tailwindScript = document.createElement('script');
         tailwindScript.src = 'https://cdn.tailwindcss.com';
         document.head.appendChild(tailwindScript);
     }
-    */
-    // Script da fonte pode continuar, se desejar
     if (!document.querySelector('link[href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"]')) {
         const fontScript = document.createElement('link');
         fontScript.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
