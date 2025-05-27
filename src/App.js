@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CheckSquare, Square } from 'lucide-react';
+import meuLogoVale from './logo192.png'; 
 
 // Constantes de Cores
 const VALE_GREEN = '#004D40';
@@ -7,7 +8,7 @@ const VALE_HEADER_TEXT = '#FFFFFF';
 const BACKGROUND_GRAY = '#F0F0F5';
 const BUTTON_BLUE = '#303F9F';
 const TEXT_COLOR = '#333333';
-const ERROR_COLOR = 'red-500';
+const ERROR_COLOR = 'text-red-500';
 
 // --- Funções de Criptografia (Frontend) ---
 
@@ -126,10 +127,25 @@ async function encryptWithAesSessionKey(aesKeyObject, dataString) {
 // --- Fim das Funções de Criptografia ---
 
 
-const ValeLogo = () => <div className="text-2xl font-bold" style={{ color: VALE_GREEN }}>VALE</div>;
+const ImagemLogoVale = () => <img src={meuLogoVale} alt="Vale Logo" className="h-8" />;
 const Header = () => (
-  <header className="w-full p-4 flex items-center justify-between" style={{ backgroundColor: VALE_GREEN, color: VALE_HEADER_TEXT }}>
-    <ValeLogo /> <h1 className="text-xl sm:text-2xl font-semibold">VES para Fornecedores</h1> <div className="w-12"></div>
+  <header
+    className="w-full p-4 flex items-center justify-between" // justify-between vai espaçar os 3 filhos diretos
+    style={{ backgroundColor: VALE_GREEN, color: VALE_HEADER_TEXT }}
+  >
+    {/* 1. Logo (ImagemLogoVale) como primeiro filho direto - vai para a esquerda */}
+    <ImagemLogoVale />
+
+    {/* 2. Título (h1) como segundo filho direto - com classes para centralizar */}
+    {/* 'flex-1' faz o h1 tentar ocupar o espaço. */}
+    {/* 'text-center' centraliza o texto DENTRO do h1. */}
+    {/* 'mx-4' (opcional) adiciona margem para não colar no logo ou no div da direita. */}
+    <h1 className="text-xl sm:text-2xl font-semibold text-center flex-1 mx-4">
+      VES para Fornecedores
+    </h1>
+
+    {/* 3. Div da direita como terceiro filho direto - vai para a direita */}
+    <div className="w-12"></div>
   </header>
 );
 
@@ -182,14 +198,14 @@ const InitialScreen = ({ onNavigate }) => {
     <div className="flex flex-col items-center p-4 sm:p-8" style={{ backgroundColor: BACKGROUND_GRAY, color: TEXT_COLOR }}>
       <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 w-full max-w-3xl rounded-md shadow-md">
         <p className="font-bold text-sm sm:text-base">PREENCHA SEUS DADOS CORRETAMENTE, PARA QUE NÃO HAJA DIVERGÊNCIAS NO CERTIFICADO!!</p>
-        <p className="mt-2 text-xs sm:text-sm">OBS.: O e-mail deverá ser exclusivo e único do usuário, não sendo possível mais de um usuário utilizar o mesmo e-mail. Para usuários que possuem e-mail CO Vale, não cadastrar o CO e sim um e-mail pessoal ou e-mail da empresa de origem. Para usuários estrangeiros utilizar o número do passaporte no campo de CPF.</p>
-        <p className="mt-2 text-xs sm:text-sm">Em caso de dúvidas, enviar um email para hse.suppliers@vale.com.</p>
+        <p className="mt-2 text-xs sm:text-sm">OBS.: O e-mail deverá ser exclusivo e único do usuário, não sendo possível mais de um usuário utilizar o mesmo e-mail. Para usuários que possuem e-mail C0 Vale, não cadastrar o C0 e sim um e-mail pessoal ou e-mail da empresa de origem. Para usuários estrangeiros utilizar o número do passaporte no campo de CPF.</p>
+        <p className="mt-2 text-xs sm:text-sm">Em caso de dúvidas, enviar um email para ssma.fornecedores@vale.com</p>
       </div>
       <hr className="w-full max-w-3xl my-4 border-gray-400"/>
       <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 w-full max-w-3xl rounded-md shadow-md">
         <p className="font-bold text-sm sm:text-base">FILL IN YOUR DATA CORRECTLY, SO THAT THERE ARE NO DIVERGENCES IN THE CERTIFICATE!</p>
-        <p className="mt-2 text-xs sm:text-sm">NOTE: The email address must be exclusive and unique to the user. It is not possible for more than one user to use the same email address. For users with a CO email address, do not register the CO email Vale. Register a personal email address or the company of origin's email address. For foreign users , use the passport number in the CPF field.</p>
-        <p className="mt-2 text-xs sm:text-sm">If you have any questions, please email hse.suppliers@vale.com</p>
+        <p className="mt-2 text-xs sm:text-sm">NOTE: The email address must be exclusive and unique to the user. It is not possible for more than one user to use the same email address. For users with a C0 email address, do not register the C0 email Vale. Register a personal email address or the company of origin's email address. For foreign users , use the passport number in the CPF field.</p>
+        <p className="mt-2 text-xs sm:text-sm">If you have any questions, please email ssma.fornecedores@vale.com</p>
       </div>
       <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-8 my-6">
         <label className="flex items-center space-x-2 p-3 rounded-md hover:bg-gray-300 cursor-pointer transition-colors">
@@ -219,7 +235,7 @@ const InputField = ({ label, id, type = "text", value, onChange, error, disabled
     <input type={type} id={id} value={value} onChange={onChange} disabled={disabled} placeholder={placeholder}
       className={`p-2 border rounded-md shadow-sm ${disabled ? 'bg-gray-200 cursor-not-allowed' : 'bg-white'} ${error ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors`}
     />
-    {error && <p className={`text-xs mt-1 ${ERROR_COLOR}`}>{error}</p>}
+    {error && <p className={`text-sm mt-1 ${ERROR_COLOR}`} style={{ fontSize: '14px' }}>{error}</p>}
   </div>
 );
 
@@ -510,7 +526,7 @@ export default function App() {
         {currentPage === 'INTERNATIONAL_FORM' && <InternationalForm onNavigate={handleNavigation} countryOrigin={countryOrigin} />}
       </main>
       <footer className="p-4 text-center text-sm text-gray-600" style={{backgroundColor: BACKGROUND_GRAY}}>
-        © {new Date().getFullYear()} Vale S.A. - User Registration System
+        © {new Date().getFullYear()} Vale S.A.
       </footer>
     </div>
   );
