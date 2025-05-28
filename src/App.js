@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CheckSquare, Square } from 'lucide-react';
-import meuLogoVale from './logo192.png'; 
+import meuLogoVale from './logo192.png';
 
 // Constantes de Cores
 const VALE_GREEN = '#004D40';
@@ -149,7 +149,7 @@ const Header = () => (
   </header>
 );
 
-const validateCPF = (cpf) => { 
+const validateCPF = (cpf) => {
   if (!cpf) return "CPF é obrigatório.";
   const cpfClean = cpf.replace(/[^\d]/g, "");
   if (cpfClean.length !== 11) return "CPF deve ter 11 dígitos.";
@@ -229,10 +229,17 @@ const InitialScreen = ({ onNavigate }) => {
   );
 };
 
-const InputField = ({ label, id, type = "text", value, onChange, error, disabled, placeholder, isOptional = false }) => (
+const InputField = ({ label, id, type = "text", value, onChange, error, disabled, placeholder, isOptional = false, maxLength }) => (
   <div className="flex flex-col w-full">
     <label htmlFor={id} className="mb-1 text-sm font-medium"> {label} {!isOptional && <span className="text-red-500">*</span>} </label>
-    <input type={type} id={id} value={value} onChange={onChange} disabled={disabled} placeholder={placeholder}
+    <input
+      type={type}
+      id={id}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      placeholder={placeholder}
+      maxLength={maxLength}
       className={`p-2 border rounded-md shadow-sm ${disabled ? 'bg-gray-200 cursor-not-allowed' : 'bg-white'} ${error ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors`}
     />
     {error && <p className={`text-sm mt-1 ${ERROR_COLOR}`} style={{ fontSize: '14px' }}>{error}</p>}
@@ -284,7 +291,20 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
+    let processedValue = value;
+
+    if (isBrazilForm && id === 'cpf') {
+      // Remove todos os caracteres não numéricos
+      const numericValue = value.replace(/[^\d]/g, "");
+      // Limita ao máximo de 11 caracteres
+      processedValue = numericValue.slice(0, 11);
+    }
+    // Adicionar aqui outras lógicas de processamento se necessário para outros campos
+    // Ex: else if (!isBrazilForm && id === 'passportNumber') {
+    //   processedValue = value.replace(/[^A-Za-z0-9]/g, "").slice(0, 20); // Exemplo para passaporte
+    // }
+
+    setFormData(prev => ({ ...prev, [id]: processedValue }));
     if (errors[id]) setErrors(prev => ({...prev, [id]: ''}));
   };
   
@@ -304,7 +324,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
     else setErrors(prev => ({ ...prev, [isBrazilForm ? 'email' : 'emailAddress']: '' }));
   }, [isBrazilForm, formData.email, formData.emailAddress]);
 
-  const isIdFieldValid = isBrazilForm 
+  const isIdFieldValid = isBrazilForm
     ? (formData.cpf && !validateCPF(formData.cpf))
     : (formData.passportNumber && !validatePassport(formData.passportNumber));
   
@@ -336,7 +356,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
       if (!formData.nome) currentErrors.nome = "Nome é obrigatório.";
       if (!formData.sobrenome) currentErrors.sobrenome = "Sobrenome é obrigatório.";
       if (!formData.numeroContrato) currentErrors.numeroContrato = "Número de Contrato é obrigatório.";
-    } else { 
+    } else {
       if (validatePassport(formData.passportNumber)) currentErrors.passportNumber = validatePassport(formData.passportNumber);
       if (validateEmail(formData.emailAddress)) currentErrors.emailAddress = validateEmail(formData.emailAddress);
       if (!formData.firstName) currentErrors.firstName = "First Name is required.";
@@ -346,7 +366,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
     setErrors(currentErrors);
 
     if (Object.keys(currentErrors).length === 0) {
-      const dataToSubmitObject = { 
+      const dataToSubmitObject = {
         'User ID': isBrazilForm ? formData.cpf : formData.passportNumber,
         'Active (*required)': 'YES', 'First Name': isBrazilForm ? formData.nome : formData.firstName,
         'Last Name': isBrazilForm ? formData.sobrenome : formData.lastName, 'Middle Initial': '', 'Gender': '', 'Job Code ID': '', 'Job Title': '',
@@ -361,7 +381,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
         'Prior Years of Service (Years)': '', 'Prior Years of Service (Months)': '', 'Related Instructor ID': '',
         'Custom Column Name N1': 'Manager', 'Custom Column Value V1': 'GER GLOBAL SSMA FORNECEDORES - PATRICIA VELOSO DE ALMEIDA',
         'Custom Column Name N2': 'Centro de Custo', 'Custom Column Value V2': '1010132',
-        'Custom Column Name N3': '', 'Custom Column Value V3': isBrazilForm ? formData.numeroContrato : formData.contractNumber,
+        'Custom Column Name N3': 'Contract Number', 'Custom Column Value V3': isBrazilForm ? formData.numeroContrato : formData.contractNumber,
         'Custom Column Name N4': '', 'Custom Column Value V4': '', 'Custom Column Name N5': '', 'Custom Column Value V5': '',
         'Custom Column Name N6': '', 'Custom Column Value V6': '', 'Custom Column Name N7': '', 'Custom Column Value V7': '',
         'Custom Column Name N8': '', 'Custom Column Value V8': '', 'Custom Column Name N9': '', 'Custom Column Value V9': '',
@@ -376,7 +396,7 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
       try {
         console.log("Iniciando processo de criptografia e envio...");
         // 1. Gerar chave de sessão AES
-        const aesSessionKeyObject = await generateAesSessionKey(); 
+        const aesSessionKeyObject = await generateAesSessionKey();
         console.log("Chave de sessão AES gerada.");
         
         // 2. Exportar chave AES para formato raw (ArrayBuffer) para ser criptografada com RSA
@@ -394,9 +414,9 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
         console.log("Dados do formulário criptografados com AES:", encryptedFormDataBase64.substring(0,30) + "...");
         
         const payload = {
-          encryptedSessionKey: encryptedSessionKeyBase64, 
-          iv: ivBase64, 
-          encryptedData: encryptedFormDataBase64, 
+          encryptedSessionKey: encryptedSessionKeyBase64,
+          iv: ivBase64,
+          encryptedData: encryptedFormDataBase64,
         };
         
         console.log("Payload final a ser enviado:", JSON.stringify(payload, null, 2).substring(0, 200) + "...");
@@ -409,8 +429,8 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
         const result = await response.json();
 
         if (response.ok) {
-          alert(`Sucesso (criptografia híbrida): ${result.message}`); 
-          onNavigate('INITIAL'); 
+          alert(`Sucesso (criptografia híbrida): ${result.message}`);
+          onNavigate('INITIAL');
         } else {
           console.error("Erro do backend:", result);
           alert(`Erro ao enviar: ${result.message || 'Ocorreu um problema no servidor.'}`);
@@ -465,26 +485,81 @@ const BaseUserForm = ({ onNavigate, countryOrigin, isBrazilForm }) => {
         {publicKeyError && <p className={`text-center font-semibold mb-4 ${ERROR_COLOR}`}>{publicKeyError}</p>}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <InputField label={dateFieldLabel} id={dateFieldId} value={dateFieldValue} disabled={true} />
-          <InputField label={idFieldLabel} id={idFieldId} value={idFieldValue} onChange={handleChange} error={idFieldError} placeholder={idFieldPlaceholder}/>
-          <InputField label={emailFieldLabel} id={emailFieldId} type="email" value={emailFieldValue} onChange={handleChange} error={emailFieldError} disabled={!isIdFieldValid} placeholder="seuemail@dominio.com"/>
+          <InputField
+            label={idFieldLabel}
+            id={idFieldId}
+            value={idFieldValue}
+            onChange={handleChange}
+            error={idFieldError}
+            placeholder={idFieldPlaceholder}
+            maxLength={isBrazilForm && idFieldId === 'cpf' ? 11 : (idFieldId === 'passportNumber' ? 20 : undefined) }
+          />
+          <InputField
+            label={emailFieldLabel}
+            id={emailFieldId}
+            type="email"
+            value={emailFieldValue}
+            onChange={handleChange}
+            error={emailFieldError}
+            disabled={!isIdFieldValid}
+            placeholder="seuemail@dominio.com"
+          />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <InputField label={nameFieldLabel} id={nameFieldId} value={nameFieldValue} onChange={handleChange} error={nameFieldError} disabled={!areDependentFieldsEnabled} placeholder={nameFieldPlaceholder}/>
-          <InputField label={lastNameFieldLabel} id={lastNameFieldId} value={lastNameFieldValue} onChange={handleChange} error={lastNameFieldError} disabled={!areDependentFieldsEnabled} placeholder={lastNameFieldPlaceholder}/>
-          <InputField label={contractFieldLabel} id={contractFieldId} value={contractFieldValue} onChange={handleChange} error={contractFieldError} disabled={!areDependentFieldsEnabled} placeholder={contractFieldPlaceholder}/>
+		<InputField
+            label={nameFieldLabel}
+            id={nameFieldId}
+            value={nameFieldValue}
+            onChange={handleChange}
+            error={nameFieldError}
+            disabled={!areDependentFieldsEnabled}
+            placeholder={nameFieldPlaceholder}
+          />
+          <InputField
+            label={lastNameFieldLabel}
+            id={lastNameFieldId}
+            value={lastNameFieldValue}
+            onChange={handleChange}
+            error={lastNameFieldError}
+            disabled={!areDependentFieldsEnabled}
+            placeholder={lastNameFieldPlaceholder}
+          />
+          <InputField
+            label={contractFieldLabel}
+            id={contractFieldId}
+            value={contractFieldValue}
+            onChange={handleChange}
+            error={contractFieldError}
+            disabled={!areDependentFieldsEnabled}
+            placeholder={contractFieldPlaceholder}
+          />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-           <InputField label={isBrazilForm ? "País" : "Country"} id={countryFieldId} value={countryFieldValue} disabled={true} />
-           <div></div> <div></div>
+            <InputField
+              label={isBrazilForm ? "País" : "Country"}
+              id={countryFieldId}
+              value={countryFieldValue}
+              disabled={true}
+            />
+            <div></div>
+            <div></div>
         </div>
         <div className="flex flex-col sm:flex-row justify-between items-center mt-8">
-          <button type="submit" disabled={!isFormCompletelyValid || isSubmitting || !!publicKeyError}
+          <button
+            type="submit"
+            disabled={!isFormCompletelyValid || isSubmitting || !!publicKeyError}
             className="px-6 py-3 text-white font-semibold rounded-lg shadow-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto mb-4 sm:mb-0"
             style={{ backgroundColor: BUTTON_BLUE }}
-          > {isSubmitting ? (isBrazilForm ? 'Enviando...' : 'Submitting...') : (isBrazilForm ? 'Enviar' : 'Submit')} </button>
-          <button type="button" onClick={() => onNavigate('INITIAL')}
+          >
+            {isSubmitting ? (isBrazilForm ? 'Enviando...' : 'Submitting...') : (isBrazilForm ? 'Enviar' : 'Submit')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('INITIAL')}
             className="flex items-center justify-center px-6 py-3 text-gray-700 font-semibold rounded-lg shadow-md hover:bg-gray-200 transition-colors border border-gray-300 w-full sm:w-auto"
-          > <ArrowLeft size={20} className="mr-2"/> {isBrazilForm ? 'Voltar' : 'Back'} </button>
+          >
+            <ArrowLeft size={20} className="mr-2"/> {isBrazilForm ? 'Voltar' : 'Back'}
+          </button>
         </div>
       </form>
     </div>
@@ -495,8 +570,8 @@ const BrazilForm = (props) => <BaseUserForm {...props} isBrazilForm={true} />;
 const InternationalForm = (props) => <BaseUserForm {...props} isBrazilForm={false} />;
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('INITIAL'); 
-  const [countryOrigin, setCountryOrigin] = useState(''); 
+  const [currentPage, setCurrentPage] = useState('INITIAL');
+  const [countryOrigin, setCountryOrigin] = useState('');
 
   const handleNavigation = (page, origin = '') => {
     setCurrentPage(page);
